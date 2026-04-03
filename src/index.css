@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light;
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.10), transparent 24%),
+    linear-gradient(180deg, #f7f8fc 0%, #eef1f7 100%);
+}
+
+html.dark {
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.08), transparent 18%),
+    linear-gradient(180deg, #07111d 0%, #0f172a 100%);
+}
+
+body {
+  @apply min-h-screen bg-transparent font-sans text-slate-900 antialiased transition-colors duration-300 dark:text-slate-100;
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 999px;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-3xl border border-white/60 bg-white/80 shadow-panel backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75 dark:shadow-none;
+  }
+
+  .metric-card {
+    @apply panel animate-fade-up p-5;
+  }
+
+  .input-base {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-accent-500 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-emerald-950;
+  }
+}
