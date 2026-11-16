@@ -1,29 +1,21 @@
 import type { LucideIcon } from "lucide-react";
-import { formatCompactCurrency } from "../lib/format";
-
-interface SummaryCardProps {
+import { formatCurrency } from "../lib/format";
+interface Props {
   title: string;
   value: number;
   note: string;
   icon: LucideIcon;
   accent: string;
 }
-
-export function SummaryCard({ title, value, note, icon: Icon, accent }: SummaryCardProps) {
+export function SummaryCard({ title, value, note, icon: Icon, accent }: Props) {
   return (
-    <article className="metric-card">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-          <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-ink-950 dark:text-white">
-            {formatCompactCurrency(value)}
-          </h2>
-        </div>
-        <div className={`rounded-2xl p-3 ${accent}`}>
-          <Icon size={22} className="text-white" />
-        </div>
+    <article className={`metric-card ${accent}`} aria-label={title}>
+      <div className="metric-label">
+        <h2>{title}</h2>
+        <Icon size={18} aria-hidden="true" />
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-300">{note}</p>
+      <p className="metric-value">{formatCurrency(value)}</p>
+      <p className="metric-note">{note}</p>
     </article>
   );
 }

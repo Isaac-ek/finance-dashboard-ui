@@ -1,10 +1,18 @@
-import { Pencil, Search, Trash2 } from "lucide-react";
-import type { FilterType, SortKey, Transaction, UserRole } from "../types/finance";
+import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, Pencil, Search, Trash2 } from "lucide-react";
+import type {
+  FilterType,
+  SortKey,
+  Transaction,
+  UserRole,
+} from "../types/finance";
 import { formatCurrency, formatDate } from "../lib/format";
+import { formatMonth } from "../lib/dates";
 import { EmptyState } from "./EmptyState";
-
-interface TransactionsTableProps {
+interface Props {
   transactions: Transaction[];
+  totalCount: number;
+  month: string;
   role: UserRole;
   search: string;
   typeFilter: FilterType;
@@ -16,9 +24,10 @@ interface TransactionsTableProps {
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
 }
-
 export function TransactionsTable({
   transactions,
+  totalCount,
+  month,
   role,
   search,
   typeFilter,
@@ -28,130 +37,134 @@ export function TransactionsTable({
   onSortChange,
   onReset,
   onEdit,
-  onDelete
-}: TransactionsTableProps) {
+  onDelete,
+}: Props) {
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    setPage(0);
+  }, [search, typeFilter, sortBy, month]);
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(transactions.length / 10) - 1),
+  );
+  const rows = transactions.slice(currentPage * 10, (currentPage + 1) * 10);
   return (
-    <section className="panel animate-fade-up p-5">
-      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <section className="panel table-panel" aria-labelledby="transactions-title">
+      <div className="table-heading">
         <div>
-          <h3 className="text-lg font-bold text-ink-950 dark:text-white">Transactions</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Search, sort, and filter your income and expense activity.
-          </p>
+          <p className="eyebrow">THE DETAILS</p>
+          <h2 id="transactions-title">Transactions</h2>
+          <p>{formatMonth(month)} · Search and filters apply to this list.</p>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_160px_180px_auto]">
-          <label className="relative">
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search by name or category"
-              className="input-base pl-10"
-            />
-          </label>
-
+        <span className="transaction-count">
+          {transactions.length} of {totalCount} entries
+        </span>
+      </div>
+      <div className="table-tools">
+        <label className="search-field">
+          <span className="sr-only">Search transactions</span>
+          <Search size={16} aria-hidden="true" />
+          <input
+            className="input-base"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search name or category"
+          />
+        </label>
+        <label>
+          <span className="sr-only">Transaction type</span>
           <select
             className="input-base"
             value={typeFilter}
-            onChange={(event) => onFilterChange(event.target.value as FilterType)}
+            onChange={(e) => onFilterChange(e.target.value as FilterType)}
           >
             <option value="all">All types</option>
             <option value="income">Income</option>
-            <option value="expense">Expense</option>
+            <option value="expense">Expenses</option>
           </select>
-
+        </label>
+        <label>
+          <span className="sr-only">Sort transactions</span>
           <select
             className="input-base"
             value={sortBy}
-            onChange={(event) => onSortChange(event.target.value as SortKey)}
+            onChange={(e) => onSortChange(e.target.value as SortKey)}
           >
             <option value="date-desc">Newest first</option>
             <option value="date-asc">Oldest first</option>
             <option value="amount-desc">Highest amount</option>
             <option value="amount-asc">Lowest amount</option>
           </select>
-
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-          >
-            Reset
-          </button>
-        </div>
+        </label>
+        <button className="secondary-button" onClick={onReset}>
+          Clear filters
+        </button>
       </div>
-
-      {transactions.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-left dark:divide-slate-800">
-              <thead className="bg-slate-50 dark:bg-slate-950/80">
-                <tr className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  <th className="px-5 py-4 font-semibold">Name</th>
-                  <th className="px-5 py-4 font-semibold">Date</th>
-                  <th className="px-5 py-4 font-semibold">Category</th>
-                  <th className="px-5 py-4 font-semibold">Type</th>
-                  <th className="px-5 py-4 font-semibold">Amount</th>
-                  {role === "admin" && <th className="px-5 py-4 font-semibold">Actions</th>}
+      {rows.length ? (
+        <>
+          <div className="table-wrap">
+            <table className="transactions-table">
+              <caption className="sr-only">
+                Transactions for {formatMonth(month)}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Transaction</th>
+                  <th scope="col" className="desktop-detail">
+                    Date
+                  </th>
+                  <th scope="col" className="desktop-detail">
+                    Category
+                  </th>
+                  <th scope="col" className="desktop-detail">
+                    Type
+                  </th>
+                  <th scope="col" className="amount-cell">
+                    Amount
+                  </th>
+                  {role === "admin" && (
+                    <th scope="col">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900/60">
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="transition hover:bg-slate-50/80 dark:hover:bg-slate-950/60">
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-slate-900 dark:text-white">{transaction.name}</div>
-                    </td>
-                    <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">
-                      {formatDate(transaction.date)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        {transaction.category}
+              <tbody>
+                {rows.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="transaction-name">{item.name}</span>
+                      <span className="mobile-detail">
+                        {formatDate(item.date)} · {item.category}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          transaction.type === "income"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                            : "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                        }`}
-                      >
-                        {transaction.type}
+                    <td className="desktop-detail">{formatDate(item.date)}</td>
+                    <td className="desktop-detail">{item.category}</td>
+                    <td className="desktop-detail">
+                      <span className={`type-label ${item.type}`}>
+                        {item.type === "income" ? "Income" : "Expense"}
                       </span>
                     </td>
-                    <td
-                      className={`px-5 py-4 text-sm font-bold ${
-                        transaction.type === "income"
-                          ? "text-accent-600"
-                          : "text-coral-500 dark:text-orange-300"
-                      }`}
-                    >
-                      {transaction.type === "income" ? "+" : "-"}
-                      {formatCurrency(transaction.amount)}
+                    <td className={`amount-cell ${item.type}`}>
+                      {item.type === "income" ? "+" : "−"}
+                      {formatCurrency(item.amount)}
                     </td>
                     {role === "admin" && (
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
+                      <td>
+                        <div className="row-actions">
                           <button
-                            type="button"
-                            onClick={() => onEdit(transaction)}
-                            className="rounded-2xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                            className="icon-button"
+                            aria-label={`Edit ${item.name}`}
+                            onClick={() => onEdit(item)}
                           >
-                            <Pencil size={16} />
+                            <Pencil size={14} aria-hidden="true" />
                           </button>
                           <button
-                            type="button"
-                            onClick={() => onDelete(transaction.id)}
-                            className="rounded-2xl border border-rose-200 p-2 text-rose-500 transition hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/50"
+                            className="icon-button"
+                            aria-label={`Delete ${item.name}`}
+                            onClick={() => onDelete(item.id)}
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} aria-hidden="true" />
                           </button>
                         </div>
                       </td>
@@ -161,7 +174,36 @@ export function TransactionsTable({
               </tbody>
             </table>
           </div>
-        </div>
+          <div className="pagination">
+            <span>
+              Showing {currentPage * 10 + 1}–
+              {Math.min((currentPage + 1) * 10, transactions.length)} of{" "}
+              {transactions.length}
+            </span>
+            {transactions.length > 10 && (
+              <div>
+                <button
+                  className="secondary-button"
+                  disabled={currentPage === 0}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  <ArrowLeft size={13} />
+                  Previous
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={(currentPage + 1) * 10 >= transactions.length}
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Next
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <EmptyState />
       )}
     </section>
   );
