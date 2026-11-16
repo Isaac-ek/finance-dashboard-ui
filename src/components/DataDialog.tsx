@@ -16,7 +16,9 @@ import {
 export function DataDialog({
   onClose,
   onDone,
+  returnFocus,
 }: {
+  returnFocus?: HTMLElement | null;
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
@@ -52,7 +54,7 @@ export function DataDialog({
     duplicates = preview.filter((r) => r.duplicate),
     accepted = preview.filter((r) => r.value && (!skip || !r.duplicate));
   useEffect(() => {
-    const trigger = document.activeElement as HTMLElement;
+    const trigger = returnFocus || (document.activeElement as HTMLElement);
     const element = ref.current!;
     const overflow = document.body.style.overflow;
     element.showModal();

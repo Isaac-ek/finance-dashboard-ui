@@ -64,13 +64,11 @@ test("CSV review blocks invalid rows, handles duplicates, exports and restores a
     fullPage: true,
   });
   page.once("dialog", (d) => d.accept());
-  await dialog
-    .getByLabel("Choose backup", { exact: true })
-    .setInputFiles({
-      name: "finance-backup.json",
-      mimeType: "application/json",
-      buffer: content,
-    });
+  await dialog.getByLabel("Choose backup", { exact: true }).setInputFiles({
+    name: "finance-backup.json",
+    mimeType: "application/json",
+    buffer: content,
+  });
   await expect(page.getByRole("status")).toContainText("Restored 2 records");
   await page.reload();
   await expect(
@@ -85,7 +83,9 @@ test("CSV review blocks invalid rows, handles duplicates, exports and restores a
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
   await expect(
     page.getByRole("button", { name: "Import & export", exact: true }),
   ).toBeFocused();

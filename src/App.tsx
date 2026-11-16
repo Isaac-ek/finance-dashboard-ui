@@ -1,6 +1,13 @@
 import { AccountGate } from "./components/AccountGate";
 import { api, accountMode, type AccountUser } from "./lib/api";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 import { CategoryChart } from "./components/CategoryChart";
 import { Header } from "./components/Header";
@@ -36,6 +43,7 @@ export default function App() {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [checking, setChecking] = useState(accountMode);
   const [connectionError, setConnectionError] = useState("");
+  const dataTrigger = useRef<HTMLButtonElement>(null);
   const [dataOpen, setDataOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -263,7 +271,11 @@ export default function App() {
             ? "Saved to your local account."
             : "Import your own USD records or keep exploring the sample."}
         </p>
-        <button className="secondary-button" onClick={() => setDataOpen(true)}>
+        <button
+          ref={dataTrigger}
+          className="secondary-button"
+          onClick={() => setDataOpen(true)}
+        >
           Import & export
         </button>
       </div>
@@ -334,6 +346,7 @@ export default function App() {
       {dataOpen && (
         <Suspense fallback={<p role="status">Opening import tools…</p>}>
           <DataDialog
+            returnFocus={dataTrigger.current}
             onClose={() => setDataOpen(false)}
             onDone={(message) => {
               setDataOpen(false);
