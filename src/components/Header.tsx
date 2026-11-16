@@ -4,6 +4,10 @@ import { formatMonth } from "../lib/dates";
 
 interface HeaderProps {
   role: UserRole;
+  accountEmail?: string;
+  personalData?: boolean;
+  onSignOut?: () => void;
+  onReload?: () => void;
   theme: ThemeMode;
   month: string;
   months: string[];
@@ -14,6 +18,10 @@ interface HeaderProps {
 }
 export function Header({
   role,
+  accountEmail,
+  personalData,
+  onSignOut,
+  onReload,
   theme,
   month,
   months,
@@ -29,19 +37,34 @@ export function Header({
           <span className="workspace-mark">
             <Wallet size={18} aria-hidden="true" />
           </span>{" "}
-          Personal workspace <span className="demo-badge">DEMO</span>
+          Personal workspace{" "}
+          <span className="demo-badge">
+            {accountEmail ? "LOCAL ACCOUNT" : "DEMO"}
+          </span>
         </div>
         <div className="workspace-controls">
-          <label className="mode-select">
-            <span className="sr-only">Demo access mode</span>
-            <select
-              value={role}
-              onChange={(e) => onRoleChange(e.target.value as UserRole)}
-            >
-              <option value="admin">Editor demo</option>
-              <option value="viewer">Read-only demo</option>
-            </select>
-          </label>
+          {accountEmail ? (
+            <>
+              <span className="account-email">{accountEmail}</span>
+              <button className="text-button" onClick={onReload}>
+                Reload records
+              </button>
+              <button className="text-button" onClick={onSignOut}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <label className="mode-select">
+              <span className="sr-only">Demo access mode</span>
+              <select
+                value={role}
+                onChange={(e) => onRoleChange(e.target.value as UserRole)}
+              >
+                <option value="admin">Editor demo</option>
+                <option value="viewer">Read-only demo</option>
+              </select>
+            </label>
+          )}
           <button
             type="button"
             className="icon-button"
@@ -87,8 +110,12 @@ export function Header({
         </div>
       </div>
       <p className="demo-note">
-        <span className="status-dot" /> Fictional sample data · Changes stay in
-        this browser.{" "}
+        <span className="status-dot" />{" "}
+        {accountEmail
+          ? "Your USD records · Saved to the local account server."
+          : personalData
+            ? "Browser-local records · Back up your data before clearing browser storage."
+            : "Fictional sample data · Changes stay in this browser."}{" "}
         {role === "viewer"
           ? "Read-only preview selected."
           : "Try adding an expense to update the overview."}

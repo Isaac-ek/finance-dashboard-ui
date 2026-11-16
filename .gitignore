@@ -11,3 +11,8 @@ infra/cdk.out
 infra/cdk.context.json
 aws-outputs.json
 __pycache__/
+
+.data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

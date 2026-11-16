@@ -1,4 +1,13 @@
-import { useEffect, useState } from "react";
+import { AccountGate } from "./components/AccountGate";
+import { api, accountMode, type AccountUser } from "./lib/api";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 import { CategoryChart } from "./components/CategoryChart";
 import { Header } from "./components/Header";
@@ -24,9 +33,18 @@ import {
 import { useFinanceStore } from "./store/useFinanceStore";
 import type { Transaction, TransactionFormValues } from "./types/finance";
 
+const DataDialog = lazy(() =>
+  import("./components/DataDialog").then((m) => ({ default: m.DataDialog })),
+);
+
 export default function App() {
   const state = useFinanceStore();
   const { transactions, role, theme, filters } = state;
+  const [user, setUser] = useState<AccountUser | null>(null);
+  const [checking, setChecking] = useState(accountMode);
+  const [connectionError, setConnectionError] = useState("");
+  const dataTrigger = useRef<HTMLButtonElement>(null);
+  const [dataOpen, setDataOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [message, setMessage] = useState("");
@@ -34,6 +52,75 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  const setAccountData = state.setAccountData,
+    clearAccount = state.clearAccount;
+  const loadAccount = useCallback(
+    async (nextUser: AccountUser) => {
+      const data = await api<{ transactions: Transaction[]; version: number }>(
+        "/transactions",
+      );
+      setAccountData(data);
+      setUser(nextUser);
+      setConnectionError("");
+    },
+    [setAccountData],
+  );
+  useEffect(() => {
+    if (!accountMode) return;
+    let active = true;
+    const expired = () => {
+      clearAccount();
+      setUser(null);
+      setDataOpen(false);
+      setModalOpen(false);
+      setDeleted(null);
+      setMessage("");
+    };
+    window.addEventListener("finance-session-expired", expired);
+    api<{ user: AccountUser }>("/auth/me")
+      .then(async (r) => {
+        const data = await api<{
+          transactions: Transaction[];
+          version: number;
+        }>("/transactions");
+        if (active) {
+          setAccountData(data);
+          setUser(r.user);
+          setConnectionError("");
+        }
+      })
+      .catch((e) => {
+        if (active && !String(e.message).includes("Sign in"))
+          setConnectionError(
+            "Cannot reach the local account server. Start npm run server, then reload.",
+          );
+      })
+      .finally(() => {
+        if (active) setChecking(false);
+      });
+    return () => {
+      active = false;
+      window.removeEventListener("finance-session-expired", expired);
+    };
+  }, [setAccountData, clearAccount]);
+  if (checking)
+    return (
+      <main className="account-shell">
+        <p role="status">Opening your local workspace…</p>
+      </main>
+    );
+  if (accountMode && !user)
+    return (
+      <>
+        {connectionError && (
+          <div className="connection-error" role="alert">
+            {connectionError}
+          </div>
+        )}
+        <AccountGate onSignedIn={loadAccount} />
+      </>
+    );
 
   const month = state.reportMonth || latestMonth(transactions);
   const latest = [monthKey(), latestMonth(transactions), month]
@@ -69,10 +156,10 @@ export default function App() {
         ? a.date.localeCompare(b.date)
         : b.date.localeCompare(a.date);
     });
-  const handleSubmit = (values: TransactionFormValues) => {
+  const handleSubmit = async (values: TransactionFormValues) => {
     if (role !== "admin") return;
-    if (editing) state.updateTransaction(editing.id, values);
-    else state.addTransaction(values);
+    if (editing) await state.updateTransaction(editing.id, values);
+    else await state.addTransaction(values);
     state.setReportMonth(values.date.slice(0, 7));
     state.resetFilters();
     setDeleted(null);
@@ -110,6 +197,31 @@ export default function App() {
     <main className="app-shell">
       <Header
         role={role}
+        accountEmail={user?.email}
+        personalData={state.dataKind === "personal"}
+        onSignOut={async () => {
+          try {
+            await api("/auth/logout", "POST", {});
+            state.clearAccount();
+            setUser(null);
+            setMessage("");
+            setDeleted(null);
+          } catch (e) {
+            setMessage(e instanceof Error ? e.message : "Sign out failed.");
+          }
+        }}
+        onReload={
+          accountMode
+            ? async () => {
+                try {
+                  await loadAccount(user!);
+                  setMessage("Latest records loaded.");
+                } catch (e) {
+                  setMessage(e instanceof Error ? e.message : "Reload failed.");
+                }
+              }
+            : undefined
+        }
         theme={theme}
         month={month}
         months={months}
@@ -153,6 +265,20 @@ export default function App() {
         </div>
         <CategoryChart data={getCategoryBreakdown(period)} />
       </div>
+      <div className="data-toolbar">
+        <p>
+          {accountMode
+            ? "Saved to your local account."
+            : "Import your own USD records or keep exploring the sample."}
+        </p>
+        <button
+          ref={dataTrigger}
+          className="secondary-button"
+          onClick={() => setDataOpen(true)}
+        >
+          Import & export
+        </button>
+      </div>
       <TransactionsTable
         transactions={filtered}
         totalCount={period.length}
@@ -169,18 +295,24 @@ export default function App() {
           setEditing(transaction);
           setModalOpen(true);
         }}
-        onDelete={(id) => {
+        onDelete={async (id) => {
           if (role !== "admin") return;
           const transaction = transactions.find((item) => item.id === id);
           if (!transaction) return;
-          state.deleteTransaction(id);
-          setDeleted(transaction);
-          setMessage("Transaction deleted.");
+          try {
+            await state.deleteTransaction(id);
+            setDeleted(transaction);
+            setMessage("Transaction deleted.");
+          } catch (e) {
+            setMessage(e instanceof Error ? e.message : "Delete failed.");
+          }
         }}
       />
       <footer className="app-footer">
         <span>
-          Fictional USD data. Editor and read-only modes are interface previews.
+          {accountMode
+            ? "USD records saved on this computer’s local server. No bank connection."
+            : "Browser-local USD records. Access modes are interface previews; no bank connection."}
         </span>
         <div>
           <a
@@ -190,25 +322,40 @@ export default function App() {
           >
             Built by Chiemelie Ekezie ↗
           </a>
-          <button
-            className="text-button"
-            disabled={role !== "admin"}
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Replace this browser’s demo transactions with a fresh sample? Your edits will be cleared.",
-                )
-              ) {
-                state.resetDemo();
-                setDeleted(null);
-                setMessage("Sample data reset.");
-              }
-            }}
-          >
-            Reset sample data
-          </button>
+          {!accountMode && (
+            <button
+              className="text-button"
+              disabled={role !== "admin"}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Replace this browser’s demo transactions with a fresh sample? Your edits will be cleared.",
+                  )
+                ) {
+                  state.resetDemo();
+                  setDeleted(null);
+                  setMessage("Sample data reset.");
+                }
+              }}
+            >
+              Reset sample data
+            </button>
+          )}
         </div>
       </footer>
+      {dataOpen && (
+        <Suspense fallback={<p role="status">Opening import tools…</p>}>
+          <DataDialog
+            returnFocus={dataTrigger.current}
+            onClose={() => setDataOpen(false)}
+            onDone={(message) => {
+              setDataOpen(false);
+              setMessage(message);
+              setDeleted(null);
+            }}
+          />
+        </Suspense>
+      )}
       {modalOpen && role === "admin" && (
         <TransactionModal
           key={editing?.id || "new"}
@@ -223,11 +370,17 @@ export default function App() {
           <span>{message}</span>
           {deleted && role === "admin" && (
             <button
-              onClick={() => {
-                state.restoreTransaction(deleted);
-                state.setReportMonth(deleted.date.slice(0, 7));
-                setDeleted(null);
-                setMessage("Transaction restored.");
+              onClick={async () => {
+                try {
+                  await state.restoreTransaction(deleted);
+                  state.setReportMonth(deleted.date.slice(0, 7));
+                  setDeleted(null);
+                  setMessage("Transaction restored.");
+                } catch (e) {
+                  setMessage(
+                    e instanceof Error ? e.message : "Restore failed.",
+                  );
+                }
               }}
             >
               Undo
