@@ -1,0 +1,160 @@
+name: Finance checks and AWS release
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test application and AWS infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            infra/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix infra --no-audit --no-fund
+      - name: Data and release failure tests
+        run: |
+          npm test
+          python3 -m unittest discover -s tests/pipeline -v
+      - name: Type-check and test infrastructure
+        run: |
+          npm --prefix infra run typecheck
+          npm --prefix infra test
+      - name: Synthesize CloudFormation locally (does not call AWS)
+        env:
+          AWS_ACCOUNT_ID: "111111111111"
+          AWS_REGION: us-east-1
+        run: npm --prefix infra run synth
+      - name: Build a traceable release
+        env:
+          RELEASE_ID: ${{ github.sha }}
+        run: |
+          npm run build
+          python3 scripts/aws_release.py prepare --release "$RELEASE_ID"
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser workflows against the built app
+        run: npm run test:e2e
+      - name: Upload verified build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: finance-release-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload infrastructure for inspection
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cloudformation-learning-template
+          path: infra/cdk.out/FinanceOverviewAws.template.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-diagnostics
+          path: test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Report cloud deployment status
+        env:
+          AWS_ENABLED: ${{ vars.AWS_DEPLOY_ENABLED }}
+        run: |
+          if [ "$AWS_ENABLED" != "true" ]; then
+            echo '### AWS deployment is disabled' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Checks, release artifacts and infrastructure synthesis run without AWS resources. Account free-plan eligibility has not been confirmed. No cloud resources are created by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    name: Stage, check and promote on AWS
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: finance-aws-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_SITE_BUCKET: ${{ vars.AWS_SITE_BUCKET }}
+      AWS_DISTRIBUTION_ID: ${{ vars.AWS_DISTRIBUTION_ID }}
+      SITE_ORIGIN: ${{ vars.AWS_SITE_ORIGIN }}
+      RELEASE_ID: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: finance-release-${{ github.sha }}
+          path: dist/
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: finance-${{ github.run_id }}
+          role-duration-seconds: 900
+      - name: Enforce free-only account requirement
+        run: python3 scripts/check_aws_free_plan.py
+      - name: Skip a superseded main commit
+        id: freshness
+        run: |
+          current=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current" = "$RELEASE_ID" ]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer commit is on main; this release will not be published.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Stage without changing the live entry
+        if: steps.freshness.outputs.current == 'true'
+        run: python3 scripts/aws_release.py stage --release "$RELEASE_ID"
+      - name: Check candidate headers and assets
+        if: steps.freshness.outputs.current == 'true'
+        run: python3 scripts/check_aws_site.py --origin "$SITE_ORIGIN" --release "$RELEASE_ID" --candidate
+      - name: Exercise candidate in the browser
+        if: steps.freshness.outputs.current == 'true'
+        env:
+          FINANCE_TEST_ORIGIN: ${{ vars.AWS_SITE_ORIGIN }}
+          FINANCE_TEST_PATH: /releases/${{ github.sha }}/index.html
+        run: npm run test:e2e
+      - name: Promote the verified release
+        id: promote
+        if: steps.freshness.outputs.current == 'true'
+        run: python3 scripts/aws_release.py promote --release "$RELEASE_ID"
+      - name: Check the live entry
+        id: live
+        if: steps.freshness.outputs.current == 'true'
+        run: python3 scripts/check_aws_site.py --origin "$SITE_ORIGIN" --release "$RELEASE_ID"
+      - name: Restore previous release if the live check fails
+        if: failure() && steps.live.outcome == 'failure' && steps.promote.outputs.previous_release != ''
+        env:
+          PREVIOUS_RELEASE: ${{ steps.promote.outputs.previous_release }}
+        run: |
+          python3 scripts/aws_release.py promote --release "$PREVIOUS_RELEASE"
+          python3 scripts/check_aws_site.py --origin "$SITE_ORIGIN" --release "$PREVIOUS_RELEASE"
+      - name: Record deployment
+        if: success() && steps.freshness.outputs.current == 'true'
+        run: |
+          echo "### Published $RELEASE_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "$SITE_ORIGIN" >> "$GITHUB_STEP_SUMMARY"

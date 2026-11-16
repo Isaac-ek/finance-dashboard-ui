@@ -1,0 +1,39 @@
+name: Restore an AWS finance release
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Full 40-character SHA of a previously staged release
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: finance-aws-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_SITE_BUCKET: ${{ vars.AWS_SITE_BUCKET }}
+      AWS_DISTRIBUTION_ID: ${{ vars.AWS_DISTRIBUTION_ID }}
+      SITE_ORIGIN: ${{ vars.AWS_SITE_ORIGIN }}
+      RELEASE_ID: ${{ inputs.release_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: finance-rollback-${{ github.run_id }}
+          role-duration-seconds: 900
+      - run: python3 scripts/check_aws_free_plan.py
+      - name: Restore the saved build without rebuilding it
+        run: |
+          python3 scripts/aws_release.py promote --release "$RELEASE_ID"
+          python3 scripts/check_aws_site.py --origin "$SITE_ORIGIN" --release "$RELEASE_ID"

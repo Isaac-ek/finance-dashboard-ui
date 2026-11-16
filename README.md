@@ -32,3 +32,11 @@ If Chrome is installed, `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test:e2e` us
 `src/lib/analytics.ts` contains cent-based aggregations; `dates.ts` handles local date-only values; `demo.ts` rebases and recognizes unedited fixtures. `src/store/useFinanceStore.ts` owns browser-local state. Components cover the overview, charts, insights, table and transaction form. The seed fixture is `src/data/mockTransactions.json`.
 
 The app uses system fonts and serves static Vite output, with no external font stylesheet or runtime API dependency. The hosted demo is linked from [Chiemelie Ekezie's portfolio](https://ekezie-chiemelie.vercel.app/).
+
+## AWS pipeline exercise
+
+[![Finance checks](https://github.com/Isaac-ek/finance-dashboard-ui/actions/workflows/finance.yml/badge.svg)](https://github.com/Isaac-ek/finance-dashboard-ui/actions/workflows/finance.yml)
+
+GitHub Actions tests the app, release failure handling and CDK infrastructure, builds a checksum-verified release, runs browser workflows and uploads the build/template for inspection. See [the AWS exercise guide](docs/aws-pipeline.md) for architecture, local practice and rollback behavior.
+
+**AWS cloud deployment is disabled.** Free-only operation was requested; an active AWS Free account plan has not been confirmed. No AWS hosting resources have been provisioned for this exercise. Checks and template synthesis work without AWS credentials; future publishing requires verified eligibility and an explicit deployment variable. The existing Vercel demo remains available.
