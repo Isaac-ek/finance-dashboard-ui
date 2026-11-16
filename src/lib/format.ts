@@ -1,7 +1,8 @@
 export const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 export const compactCurrencyFormatter = new Intl.NumberFormat("en-US", {
@@ -30,5 +31,5 @@ export function formatCompactCurrency(value: number) {
 }
 
 export function formatDate(value: string) {
-  return dateFormatter.format(new Date(value));
+  return dateFormatter.format(new Date(`${value}T12:00:00`));
 }

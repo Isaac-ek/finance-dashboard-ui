@@ -5,77 +5,149 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-  YAxis
+  YAxis,
 } from "recharts";
-import { formatCompactCurrency } from "../lib/format";
-
-interface TrendChartProps {
+import { formatCompactCurrency, formatCurrency } from "../lib/format";
+interface Props {
   data: Array<{
+    key: string;
     label: string;
+    fullLabel: string;
     income: number;
     expenses: number;
     balance: number;
   }>;
 }
-
-export function TrendChart({ data }: TrendChartProps) {
+export function TrendChart({ data }: Props) {
+  const hasActivity = data.some((item) => item.income || item.expenses);
   return (
-    <div className="panel animate-fade-up p-5">
-      <div className="mb-6 flex items-start justify-between">
+    <section className="panel trend-panel" aria-labelledby="cash-flow-title">
+      <div className="panel-heading">
         <div>
-          <h3 className="text-lg font-bold text-ink-950 dark:text-white">6-Month Cash Trend</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Income and expense movement over the last six months.
+          <p className="eyebrow">THE BIG PICTURE</p>
+          <h2 id="cash-flow-title">Cash flow</h2>
+          <p>
+            {data[0].fullLabel} – {data[5].fullLabel}
           </p>
         </div>
+        <div className="chart-legend">
+          <span>
+            <i className="income-dot" />
+            Income
+          </span>
+          <span>
+            <i className="expense-dot" />
+            Expenses
+          </span>
+        </div>
       </div>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
-            <defs>
-              <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f97316" stopOpacity={0.28} />
-                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} />
-            <YAxis
-              tickFormatter={(value) => formatCompactCurrency(value)}
-              tickLine={false}
-              axisLine={false}
-              width={72}
-            />
-            <Tooltip
-              formatter={(value: number) => formatCompactCurrency(value)}
-              contentStyle={{
-                borderRadius: "16px",
-                border: "1px solid rgba(148,163,184,0.2)",
-                backgroundColor: "rgba(15, 23, 42, 0.96)",
-                color: "#fff"
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="income"
-              stroke="#0d9488"
-              strokeWidth={3}
-              fill="url(#incomeFill)"
-            />
-            <Area
-              type="monotone"
-              dataKey="expenses"
-              stroke="#f97316"
-              strokeWidth={3}
-              fill="url(#expenseFill)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      {hasActivity ? (
+        <>
+          <div className="trend-chart" aria-hidden="true">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={data}
+                margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="income-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor="var(--chart-income)"
+                      stopOpacity={0.16}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="var(--chart-income)"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeDasharray="3 5"
+                />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: "var(--muted)", fontSize: 12 }}
+                  dy={8}
+                />
+                <YAxis
+                  tickFormatter={formatCompactCurrency}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: "var(--muted)", fontSize: 11 }}
+                  width={58}
+                />
+                <Tooltip<number, string>
+                  labelFormatter={(_, payload) =>
+                    payload?.[0]?.payload?.fullLabel || ""
+                  }
+                  formatter={(
+                    value: number,
+                    name: string,
+                  ): [string, string] => [
+                    formatCurrency(value),
+                    name === "income" ? "Income" : "Expenses",
+                  ]}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    color: "var(--text)",
+                    fontSize: 12,
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  stroke="var(--chart-income)"
+                  strokeWidth={2.5}
+                  fill="url(#income-fill)"
+                  isAnimationActive={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expenses"
+                  stroke="var(--chart-expense)"
+                  strokeWidth={2.5}
+                  fill="transparent"
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <details className="chart-data">
+            <summary>View monthly figures</summary>
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Income</th>
+                  <th>Expenses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((item) => (
+                  <tr key={item.key}>
+                    <th>{item.fullLabel}</th>
+                    <td>{formatCurrency(item.income)}</td>
+                    <td>{formatCurrency(item.expenses)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </>
+      ) : (
+        <div className="chart-empty">
+          No activity in these six months. Choose another reporting month or add
+          a transaction.
+        </div>
+      )}
+    </section>
   );
 }
