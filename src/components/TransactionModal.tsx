@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { accountMode } from "../lib/api";
 import { X } from "lucide-react";
 import type {
   Transaction,
@@ -9,7 +10,7 @@ interface Props {
   initialValue?: Transaction | null;
   defaultDate: string;
   onClose: () => void;
-  onSubmit: (values: TransactionFormValues) => void;
+  onSubmit: (values: TransactionFormValues) => Promise<void>;
 }
 const categories = [
   "Salary",
@@ -40,6 +41,7 @@ export function TransactionModal({
     category: initialValue?.category || "Food",
     type: initialValue?.type || ("expense" as TransactionType),
   }));
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
@@ -61,7 +63,7 @@ export function TransactionModal({
       aria-labelledby="transaction-title"
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        if (!busy) onClose();
       }}
     >
       <div className="modal-heading">
@@ -72,11 +74,16 @@ export function TransactionModal({
           <h2 id="transaction-title">
             {initialValue ? "Edit transaction" : "Add transaction"}
           </h2>
-          <p>Changes update the overview and stay in this browser.</p>
+          <p>
+            {accountMode
+              ? "Changes are saved to your local account."
+              : "Changes update the overview and stay in this browser."}
+          </p>
         </div>
         <button
           className="icon-button"
           aria-label="Close transaction form"
+          disabled={busy}
           onClick={onClose}
         >
           <X size={17} />
@@ -84,7 +91,7 @@ export function TransactionModal({
       </div>
       <form
         className="transaction-form"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           const amount = Number(values.amount);
           if (
@@ -96,12 +103,22 @@ export function TransactionModal({
             setError("Enter a name and a valid amount greater than zero.");
             return;
           }
-          onSubmit({
-            ...values,
-            name: values.name.trim(),
-            amount: Math.round((amount + Number.EPSILON) * 100) / 100,
-          });
-          onClose();
+          setBusy(true);
+          setError("");
+          try {
+            await onSubmit({
+              ...values,
+              name: values.name.trim(),
+              amount: Math.round((amount + Number.EPSILON) * 100) / 100,
+            });
+            onClose();
+          } catch (e) {
+            setError(
+              e instanceof Error ? e.message : "Could not save transaction.",
+            );
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         <label className="form-wide">
@@ -147,7 +164,9 @@ export function TransactionModal({
             value={values.category}
             onChange={(e) => setValues({ ...values, category: e.target.value })}
           >
-            {categories.map((category) => (
+            {[
+              ...new Set([values.category, ...categories, "Uncategorized"]),
+            ].map((category) => (
               <option key={category}>{category}</option>
             ))}
           </select>
@@ -171,11 +190,20 @@ export function TransactionModal({
           </p>
         )}
         <div className="form-actions form-wide">
-          <button type="button" className="secondary-button" onClick={onClose}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onClose}
+            disabled={busy}
+          >
             Cancel
           </button>
-          <button type="submit" className="primary-button">
-            {initialValue ? "Save changes" : "Add transaction"}
+          <button type="submit" className="primary-button" disabled={busy}>
+            {busy
+              ? "Saving…"
+              : initialValue
+                ? "Save changes"
+                : "Add transaction"}
           </button>
         </div>
       </form>

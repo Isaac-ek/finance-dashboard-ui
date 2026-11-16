@@ -1,6 +1,6 @@
 # Finance overview
 
-A browser-local personal finance demo built with React, TypeScript, Zustand and Recharts. It demonstrates one complete workflow: add a transaction, see the selected month's totals and charts update, edit the record, then delete and undo it.
+A personal finance interface with a browser-local demo and an optional local account/API mode, built with React, TypeScript, Zustand and Recharts. It demonstrates one complete workflow: add a transaction, see the selected month's totals and charts update, edit the record, then delete and undo it.
 
 ## Run and verify
 
@@ -24,7 +24,7 @@ If Chrome is installed, `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test:e2e` us
 - Amounts accept cents; aggregation uses integer cents. Zero previous-month expenses produce a descriptive comparison rather than a fabricated percentage decrease.
 - New sample data is rebased into the latest six months. Persisted, untouched sample data rolls forward when a new month starts. Edited records retain their original dates and amounts. Older saved datasets migrate without overwriting visitor changes.
 - Editor and read-only modes preview interface behavior. They are not authentication or server-side permissions. Transaction editing and sample resets are disabled in the read-only preview.
-- Transactions, theme, mode, reporting month and filters persist in this browser. Reset sample data asks before discarding edits. No bank connections, customer accounts or backend services are involved.
+- Transactions, theme, mode, reporting month and filters persist in this browser. Reset sample data asks before discarding edits. The public demo has no bank connection or account service. Optional local account mode uses a separate SQLite API; see below.
 - Native modal dialogs support keyboard dismissal, focus trapping and return focus. The charts also expose exact figures as text; the transaction table fits small screens.
 
 ## Source layout
@@ -40,3 +40,11 @@ The app uses system fonts and serves static Vite output, with no external font s
 GitHub Actions tests the app, release failure handling and CDK infrastructure, builds a checksum-verified release, runs browser workflows and uploads the build/template for inspection. See [the AWS exercise guide](docs/aws-pipeline.md) for architecture, local practice and rollback behavior.
 
 **AWS cloud deployment is disabled.** Free-only operation was requested; an active AWS Free account plan has not been confirmed. No AWS hosting resources have been provisioned for this exercise. Checks and template synthesis work without AWS credentials; future publishing requires verified eligibility and an explicit deployment variable. The existing Vercel demo remains available.
+
+## Import, export and local accounts
+
+Use **Import & export** to map CSV columns, review row errors and possible duplicates, export all records, or download/restore a versioned JSON backup. Imports support ISO, day-first and month-first dates; amounts are USD and never converted. Restore/replacement asks before replacing existing data.
+
+[Local account mode](docs/local-accounts.md) adds registration/sign-in, user-scoped SQLite records, conflict-safe writes and database backup/recovery. Run `npm run server` and `npm run dev:accounts` in separate terminals, then open http://127.0.0.1:5186. This local API is not deployed on Vercel. The public build continues to run without API calls.
+
+[Fictional CSV samples and the tester checklist](docs/try-it-and-feedback.md) are ready for three usability sessions; no user-feedback results are claimed yet.
