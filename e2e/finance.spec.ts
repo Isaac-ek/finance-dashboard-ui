@@ -17,7 +17,7 @@ test("an expense updates all views, supports edit/delete/undo and persists", asy
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.clock.install({ time: fixedDate });
-  await page.goto("/");
+  await page.goto(process.env.FINANCE_TEST_PATH || "/");
   await expect(page.getByLabel("Reporting month")).toHaveValue("2026-11");
   await expect(metric(page, "Expenses")).toHaveText("$1,620.00");
   await expect(page.locator(".recharts-area-curve").first()).toBeVisible();
@@ -133,7 +133,7 @@ test("legacy untouched sample dates refresh; edited records retain their dates a
         ),
       records,
     );
-    await page.goto("/");
+    await page.goto(process.env.FINANCE_TEST_PATH || "/");
     await expect(page.getByLabel("Reporting month")).toHaveValue(
       edited ? "2026-04" : "2026-11",
     );
@@ -183,7 +183,7 @@ test("unchanged current demo rolls forward safely, including first-day clamping"
       ),
     records,
   );
-  await page.goto("/");
+  await page.goto(process.env.FINANCE_TEST_PATH || "/");
   await expect(page.getByLabel("Reporting month")).toHaveValue("2026-12");
   expect(
     await page.evaluate(
@@ -199,7 +199,7 @@ test("phone layouts fit and decimal entry remains usable", async ({
 }, testInfo) => {
   await page.clock.install({ time: fixedDate });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto(process.env.FINANCE_TEST_PATH || "/");
   await expect(
     page.getByRole("heading", { name: "Finance overview." }),
   ).toBeVisible();

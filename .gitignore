@@ -6,3 +6,8 @@ vite.config.d.ts
 
 playwright-report
 test-results
+
+infra/cdk.out
+infra/cdk.context.json
+aws-outputs.json
+__pycache__/

@@ -1,0 +1,20 @@
+{
+  "name": "finance-aws-infrastructure",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "synth": "cdk synth --quiet",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.277.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1148.1",
+    "tsx": "4.23.15",
+    "typescript": "^5.7.2",
+    "@types/node": "^24.0.0"
+  }
+}
